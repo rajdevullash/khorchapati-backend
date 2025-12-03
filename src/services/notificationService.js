@@ -37,6 +37,7 @@ class NotificationService {
         'settlement_request': 'settlements',
         'settlement_done': 'settlements',
         'payment_reminder': 'reminders',
+        'subscription_reminder': 'reminders',
         'budget_alert': 'budgets'
       };
       

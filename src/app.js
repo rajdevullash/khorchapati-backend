@@ -41,4 +41,10 @@ app.use('/api/upload', uploadRoutes);
 // basic health
 app.get('/health', (req, res) => res.json({ ok: true }));
 
+// Start subscription reminder scheduler
+if (process.env.NODE_ENV !== 'test') {
+  const { startScheduler } = require('./utils/scheduler');
+  startScheduler();
+}
+
 module.exports = app;

@@ -13,7 +13,23 @@ const recurringTransactionSchema = new mongoose.Schema({
   endDate: { type: Date }, // optional, null = indefinite
   nextRunDate: { type: Date },
   isActive: { type: Boolean, default: true },
-  createdAt: { type: Date, default: Date.now }
+  
+  // Subscription/EMI specific fields
+  subscriptionType: { 
+    type: String, 
+    enum: ['bill', 'emi', 'rent', 'subscription', 'other'], 
+    default: 'other' 
+  },
+  reminderDays: { 
+    type: [Number], 
+    default: [3, 1, 0] // Remind 3 days before, 1 day before, and on due date
+  },
+  lastReminderSent: { type: Date },
+  lastPaidDate: { type: Date },
+  autoPay: { type: Boolean, default: false },
+  
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
 });
 
 module.exports = mongoose.model('RecurringTransaction', recurringTransactionSchema);

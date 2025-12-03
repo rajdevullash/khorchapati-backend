@@ -1,5 +1,6 @@
 const RecurringTransaction = require('../models/RecurringTransaction');
 const { recurringTransactionSchema } = require('../validators/recurringTransaction');
+const subscriptionReminderService = require('../services/subscriptionReminderService');
 
 exports.list = async (req, res) => {
   try {
@@ -71,5 +72,40 @@ exports.toggleActive = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
+  }
+};
+
+/**
+ * Get upcoming subscriptions (for reminder dashboard)
+ */
+exports.getUpcoming = async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 7;
+    const upcoming = await subscriptionReminderService.getUpcomingSubscriptions(req.user.id, days);
+    res.json(upcoming);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+/**
+ * Mark subscription as paid and update next run date
+ */
+exports.markAsPaid = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { paidDate } = req.body;
+    
+    const subscription = await subscriptionReminderService.markAsPaid(
+      id,
+      req.user.id,
+      paidDate ? new Date(paidDate) : new Date()
+    );
+    
+    res.json(subscription);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message || 'Server error' });
   }
 };

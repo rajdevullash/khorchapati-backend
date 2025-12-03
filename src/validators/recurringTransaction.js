@@ -9,7 +9,10 @@ const recurringTransactionSchema = z.object({
   note: z.string().optional(),
   frequency: z.enum(['daily', 'weekly', 'monthly', 'yearly']).optional(),
   startDate: z.preprocess((d) => (d ? new Date(d) : new Date()), z.date()),
-  endDate: z.preprocess((d) => (d ? new Date(d) : undefined), z.date().optional())
+  endDate: z.preprocess((d) => (d ? new Date(d) : undefined), z.date().optional()),
+  subscriptionType: z.enum(['bill', 'emi', 'rent', 'subscription', 'other']).optional(),
+  reminderDays: z.array(z.number()).optional(),
+  autoPay: z.boolean().optional()
 });
 
 module.exports = { recurringTransactionSchema };
