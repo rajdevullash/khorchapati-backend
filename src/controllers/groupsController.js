@@ -16,10 +16,13 @@ exports.create = async (req, res) => {
       avatar: avatar || '',
       currency: currency || 'BDT',
       owner: req.user.id, 
-      members: [req.user.id], 
+      members: [], // Don't add owner to members array - owner is separate
       inviteCode 
     });
-    res.json(group);
+    const populated = await FamilyGroup.findById(group._id)
+      .populate('owner', 'name email')
+      .populate('members', 'name email');
+    res.json(populated);
   } catch (err) {
     console.error('Create group error:', err);
     res.status(500).json({ error: 'Server error' });

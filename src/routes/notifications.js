@@ -13,5 +13,6 @@ router.put('/read-all', notificationsController.markAllAsRead);
 router.delete('/:id', notificationsController.deleteNotification);
 router.post('/push-token', notificationsController.updatePushToken);
 router.put('/settings', notificationsController.updateSettings);
+router.post('/broadcast', notificationsController.broadcastToAll);
 
 module.exports = router;

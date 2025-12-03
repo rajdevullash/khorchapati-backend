@@ -133,3 +133,33 @@ exports.getUnreadCount = async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 };
+
+// Broadcast notification to all users (Admin only)
+exports.broadcastToAll = async (req, res) => {
+  try {
+    const { title, message, type = 'info', data = {} } = req.body;
+
+    if (!title || !message) {
+      return res.status(400).json({ error: 'Title and message are required' });
+    }
+
+    const notification = {
+      type: type || 'info',
+      title,
+      message,
+      data,
+      priority: 'high'
+    };
+
+    const result = await notificationService.broadcastToAllUsers(notification);
+    
+    res.json({
+      success: true,
+      message: `Notification sent to ${result.sent} users`,
+      ...result
+    });
+  } catch (error) {
+    console.error('Broadcast error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};

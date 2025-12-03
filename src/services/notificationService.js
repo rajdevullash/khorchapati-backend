@@ -77,6 +77,7 @@ class NotificationService {
         } catch (error) {
           console.error('Error sending push notification chunk:', error);
         }
+
       }
 
       console.log('Push notification sent:', tickets);
@@ -97,6 +98,42 @@ class NotificationService {
       this.sendNotification(userId, notification)
     );
     return Promise.allSettled(promises);
+  }
+
+  /**
+   * Send notification to ALL users (broadcast)
+   * @param {object} notification - Notification data
+   */
+  async broadcastToAllUsers(notification) {
+    try {
+      const User = require('../models/User');
+      
+      // Get all users who have notifications enabled
+      const users = await User.find({ 
+        notificationsEnabled: true,
+        pushToken: { $exists: true, $ne: null }
+      }).select('_id');
+
+      const userIds = users.map(user => user._id.toString());
+      console.log(`📢 Broadcasting to ${userIds.length} users`);
+
+      if (userIds.length === 0) {
+        console.log('⚠️ No users found with notifications enabled');
+        return { sent: 0, failed: 0 };
+      }
+
+      // Send to all users
+      const results = await this.sendBulkNotifications(userIds, notification);
+      
+      const sent = results.filter(r => r.status === 'fulfilled').length;
+      const failed = results.filter(r => r.status === 'rejected').length;
+
+      console.log(`✅ Broadcast complete: ${sent} sent, ${failed} failed`);
+      return { sent, failed, total: userIds.length };
+    } catch (error) {
+      console.error('Error broadcasting to all users:', error);
+      throw error;
+    }
   }
 
   /**
@@ -315,3 +352,4 @@ class NotificationService {
 }
 
 module.exports = new NotificationService();
+
