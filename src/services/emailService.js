@@ -1,14 +1,62 @@
 const nodemailer = require('nodemailer');
 
-// Create transporter - using Gmail SMTP (you can configure with your email service)
+// Create transporter with better configuration for production
 const createTransporter = () => {
-  // For development, you can use Gmail or any SMTP service
-  // For production, use a service like SendGrid, Mailgun, or AWS SES
+  // Check if using SendGrid
+  if (process.env.SENDGRID_API_KEY) {
+    return nodemailer.createTransport({
+      service: 'SendGrid',
+      auth: {
+        user: 'apikey',
+        pass: process.env.SENDGRID_API_KEY
+      }
+    });
+  }
+
+  // Check if using custom SMTP
+  if (process.env.SMTP_HOST && process.env.SMTP_PORT) {
+    return nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT) || 587,
+      secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+      auth: {
+        user: process.env.SMTP_USER || process.env.EMAIL_USER,
+        pass: process.env.SMTP_PASS || process.env.EMAIL_PASS
+      },
+      connectionTimeout: 10000, // 10 seconds
+      greetingTimeout: 10000,
+      socketTimeout: 10000,
+      tls: {
+        rejectUnauthorized: false // For self-signed certificates
+      }
+    });
+  }
+
+  // Default: Gmail SMTP with improved settings
+  const emailUser = process.env.EMAIL_USER;
+  const emailPass = process.env.EMAIL_PASS;
+  
+  if (!emailUser || !emailPass) {
+    console.warn('⚠️ EMAIL_USER or EMAIL_PASS not set. Email service will fail.');
+    console.warn('💡 Set ALLOW_EMAIL_FAILURE=true to log OTP in console instead.');
+  }
+  
   return nodemailer.createTransport({
     service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false, // true for 465, false for other ports
     auth: {
-      user: process.env.EMAIL_USER || 'your-email@gmail.com',
-      pass: process.env.EMAIL_PASS || 'your-app-password' // Use App Password for Gmail
+      user: emailUser || 'your-email@gmail.com',
+      pass: emailPass || 'your-app-password' // Use App Password for Gmail
+    },
+    connectionTimeout: 15000, // 15 seconds
+    greetingTimeout: 15000,
+    socketTimeout: 15000,
+    pool: false, // Disable pooling for better reliability
+    tls: {
+      rejectUnauthorized: false, // Sometimes needed for certain networks
+      ciphers: 'SSLv3'
     }
   });
 };
@@ -41,17 +89,31 @@ exports.sendOTP = async (email, code) => {
       text: `Your verification code is: ${code}. This code will expire in 10 minutes.`
     };
 
-    const info = await transporter.sendMail(mailOptions);
+    // Add timeout wrapper
+    const sendWithTimeout = Promise.race([
+      transporter.sendMail(mailOptions),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Email sending timeout')), 15000)
+      )
+    ]);
+
+    const info = await sendWithTimeout;
     console.log('✅ OTP email sent:', info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('❌ Error sending OTP email:', error);
-    // In development, log the OTP instead of failing
-    if (process.env.NODE_ENV === 'development') {
-      console.log('📧 [DEV MODE] OTP for', email, ':', code);
-      return { success: true, devMode: true };
+    
+    // Always log OTP in console for debugging (even in production)
+    console.log('📧 [FALLBACK] OTP for', email, ':', code);
+    console.log('⚠️ Email service unavailable. OTP logged above for manual verification.');
+    
+    // In development or if email fails, return success with dev mode flag
+    if (process.env.NODE_ENV === 'development' || process.env.ALLOW_EMAIL_FAILURE === 'true') {
+      return { success: true, devMode: true, code }; // Return code for testing
     }
-    throw error;
+    
+    // In production, still throw error but log the OTP
+    throw new Error(`Email sending failed: ${error.message}. OTP: ${code} (logged in console)`);
   }
 };
 
@@ -84,17 +146,31 @@ exports.sendPasswordResetOTP = async (email, code) => {
       text: `Your password reset code is: ${code}. This code will expire in 10 minutes. If you didn't request this, please ignore this email.`
     };
 
-    const info = await transporter.sendMail(mailOptions);
+    // Add timeout wrapper
+    const sendWithTimeout = Promise.race([
+      transporter.sendMail(mailOptions),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Email sending timeout')), 15000)
+      )
+    ]);
+
+    const info = await sendWithTimeout;
     console.log('✅ Password reset OTP email sent:', info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('❌ Error sending password reset OTP email:', error);
-    // In development, log the OTP instead of failing
-    if (process.env.NODE_ENV === 'development') {
-      console.log('📧 [DEV MODE] Password reset OTP for', email, ':', code);
-      return { success: true, devMode: true };
+    
+    // Always log OTP in console for debugging (even in production)
+    console.log('📧 [FALLBACK] Password reset OTP for', email, ':', code);
+    console.log('⚠️ Email service unavailable. OTP logged above for manual verification.');
+    
+    // In development or if email fails, return success with dev mode flag
+    if (process.env.NODE_ENV === 'development' || process.env.ALLOW_EMAIL_FAILURE === 'true') {
+      return { success: true, devMode: true, code }; // Return code for testing
     }
-    throw error;
+    
+    // In production, still throw error but log the OTP
+    throw new Error(`Email sending failed: ${error.message}. OTP: ${code} (logged in console)`);
   }
 };
 
