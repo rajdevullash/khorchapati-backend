@@ -1,7 +1,6 @@
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
-const session = require('express-session');
 const passport = require('./config/passport');
 const config = require('./config');
 
@@ -22,30 +21,15 @@ const uploadRoutes = require('./routes/upload');
 
 const app = express();
 
-// CORS configuration for OAuth
+// CORS configuration
 app.use(cors({
   origin: process.env.FRONTEND_URL || '*',
   credentials: true,
 }));
 app.use(express.json());
 
-// Session configuration for Passport
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || config.jwtSecret,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === 'production',
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    },
-  })
-);
-
 // Initialize Passport
 app.use(passport.initialize());
-app.use(passport.session());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/transactions', transactionRoutes);
@@ -64,6 +48,9 @@ app.use('/api/upload', uploadRoutes);
 
 // basic health
 app.get('/health', (req, res) => res.json({ ok: true }));
+
+// Public config endpoint (for frontend to get Google Client ID)
+app.get('/api/config', require('./controllers/configController').getConfig);
 
 // Start subscription reminder scheduler
 if (process.env.NODE_ENV !== 'test') {

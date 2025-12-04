@@ -139,7 +139,6 @@ exports.login = async (req, res) => {
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
 
     // Support for Google auth users (no password)
-    if (!user.passwordHash) return res.status(401).json({ error: 'Please use Google login' });
 
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
@@ -260,43 +259,6 @@ exports.resetPassword = async (req, res) => {
   }
 };
 
-// Google OAuth callback handler
-exports.googleCallback = async (req, res) => {
-  try {
-    const user = req.user;
-    
-    if (!user) {
-      const redirectUri = req.query.redirect_uri || process.env.FRONTEND_URL || 'aybay://auth/callback';
-      return res.redirect(`${redirectUri}?error=authentication_failed`);
-    }
-
-    // Generate JWT token
-    const token = jwt.sign({ id: user._id }, config.jwtSecret, { expiresIn: '7d' });
-
-    // Get redirect URI from query or use default
-    const redirectUri = req.query.redirect_uri || process.env.FRONTEND_URL || 'aybay://auth/callback';
-    
-    // Redirect to frontend with token (using deep link for mobile)
-    const redirectUrl = `${redirectUri}?token=${token}&user=${encodeURIComponent(JSON.stringify({
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      avatar: user.avatar
-    }))}`;
-    
-    res.redirect(redirectUrl);
-  } catch (error) {
-    console.error('Google OAuth callback error:', error);
-    const redirectUri = req.query.redirect_uri || process.env.FRONTEND_URL || 'aybay://auth/callback';
-    res.redirect(`${redirectUri}?error=server_error`);
-  }
-};
-
-// Google OAuth failure handler
-exports.googleFailure = (req, res) => {
-  const redirectUri = req.query.redirect_uri || process.env.FRONTEND_URL || 'aybay://auth/callback';
-  res.redirect(`${redirectUri}?error=authentication_failed`);
-};
 
 exports.updateProfile = async (req, res) => {
   try {
