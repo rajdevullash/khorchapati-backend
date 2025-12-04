@@ -1,10 +1,14 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
 const OTP = require('../models/OTP');
 const { registerSchema, loginSchema } = require('../validators/auth');
 const config = require('../config');
 const emailService = require('../services/emailService');
+
+// Initialize Google OAuth2 client
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Send OTP for email verification
 exports.sendOTP = async (req, res) => {
@@ -295,5 +299,96 @@ exports.updateProfile = async (req, res) => {
   } catch (err) {
     console.error('Update profile error:', err);
     res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// Google Sign-In with ID Token (for @react-native-google-signin/google-signin)
+exports.googleSignInWithIdToken = async (req, res) => {
+  try {
+    const { idToken } = req.body;
+
+    if (!idToken) {
+      return res.status(400).json({ error: 'ID token is required' });
+    }
+
+    // Verify the ID token
+    let ticket;
+    try {
+      ticket = await client.verifyIdToken({
+        idToken,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+    } catch (error) {
+      console.error('ID token verification failed:', error);
+      return res.status(401).json({ error: 'Invalid ID token' });
+    }
+
+    const payload = ticket.getPayload();
+    const googleId = payload['sub'];
+    const email = payload['email'];
+    const name = payload['name'];
+    const picture = payload['picture'];
+
+    // Check if user already exists with this Google ID
+    let user = await User.findOne({ googleId });
+
+    if (user) {
+      // User exists, return user
+      const token = jwt.sign({ id: user._id }, config.jwtSecret, { expiresIn: '7d' });
+      return res.json({
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          avatar: user.avatar,
+        },
+      });
+    }
+
+    // Check if user exists with this email (but no Google ID)
+    user = await User.findOne({ email });
+
+    if (user) {
+      // Link Google account to existing user
+      user.googleId = googleId;
+      if (!user.avatar && picture) {
+        user.avatar = picture;
+      }
+      await user.save();
+
+      const token = jwt.sign({ id: user._id }, config.jwtSecret, { expiresIn: '7d' });
+      return res.json({
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          avatar: user.avatar,
+        },
+      });
+    }
+
+    // Create new user
+    user = await User.create({
+      googleId,
+      name,
+      email,
+      avatar: picture || null,
+    });
+
+    const token = jwt.sign({ id: user._id }, config.jwtSecret, { expiresIn: '7d' });
+    res.json({
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        avatar: user.avatar,
+      },
+    });
+  } catch (error) {
+    console.error('Google Sign-In error:', error);
+    res.status(500).json({ error: 'Server error during authentication' });
   }
 };

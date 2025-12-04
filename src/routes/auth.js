@@ -13,7 +13,10 @@ router.post('/forgot-password', authController.sendPasswordResetOTP);
 router.post('/reset-password', authController.resetPassword);
 router.post('/login', authController.login);
 
-// Google Token-based authentication route
+// Google ID Token authentication route (for @react-native-google-signin/google-signin)
+router.post('/google/signin', authController.googleSignInWithIdToken);
+
+// Google Token-based authentication route (LEGACY - for expo-auth-session)
 router.post(
   '/google/token',
   passport.authenticate('google-token', { session: false }),
