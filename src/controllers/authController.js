@@ -1,8 +1,87 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const OTP = require('../models/OTP');
 const { registerSchema, loginSchema } = require('../validators/auth');
 const config = require('../config');
+const emailService = require('../services/emailService');
+
+// Send OTP for email verification
+exports.sendOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ error: 'Valid email is required' });
+    }
+
+    // Check if email is already registered
+    const existing = await User.findOne({ email });
+    if (existing) {
+      return res.status(409).json({ error: 'Email already in use' });
+    }
+
+    // Generate 6-digit OTP
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Delete any existing OTPs for this email (email verification type)
+    await OTP.deleteMany({ email, type: 'email-verification' });
+
+    // Create new OTP (expires in 10 minutes)
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    await OTP.create({ email, code, expiresAt, type: 'email-verification' });
+
+    // Send OTP email
+    try {
+      await emailService.sendOTP(email, code);
+      res.json({ message: 'OTP sent to your email', email });
+    } catch (emailError) {
+      console.error('Email sending error:', emailError);
+      // In development, still return success
+      if (process.env.NODE_ENV === 'development') {
+        res.json({ message: 'OTP sent (check console for dev mode)', email, devCode: code });
+      } else {
+        res.status(500).json({ error: 'Failed to send OTP email' });
+      }
+    }
+  } catch (err) {
+    console.error('Send OTP error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// Verify OTP
+exports.verifyOTP = async (req, res) => {
+  try {
+    const { email, code } = req.body;
+
+    if (!email || !code) {
+      return res.status(400).json({ error: 'Email and OTP code are required' });
+    }
+
+    // Find OTP
+    const otp = await OTP.findOne({ email, code, verified: false });
+
+    if (!otp) {
+      return res.status(400).json({ error: 'Invalid or expired OTP' });
+    }
+
+    // Check if expired
+    if (new Date() > otp.expiresAt) {
+      await OTP.deleteOne({ _id: otp._id });
+      return res.status(400).json({ error: 'OTP has expired' });
+    }
+
+    // Mark as verified
+    otp.verified = true;
+    await otp.save();
+
+    res.json({ message: 'Email verified successfully', email });
+  } catch (err) {
+    console.error('Verify OTP error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
 
 exports.register = async (req, res) => {
   try {
@@ -12,8 +91,17 @@ exports.register = async (req, res) => {
     const existing = await User.findOne({ email });
     if (existing) return res.status(409).json({ error: 'Email already in use' });
 
+    // Check if email is verified
+    const verifiedOTP = await OTP.findOne({ email, verified: true, type: 'email-verification' });
+    if (!verifiedOTP) {
+      return res.status(400).json({ error: 'Please verify your email first' });
+    }
+
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await User.create({ name, email, passwordHash });
+
+    // Delete verified OTP after successful registration
+    await OTP.deleteOne({ _id: verifiedOTP._id });
 
     const token = jwt.sign({ id: user._id }, config.jwtSecret, { expiresIn: '7d' });
     res.json({ user: { id: user._id, name: user.name, email: user.email, avatar: user.avatar }, token });
@@ -45,6 +133,135 @@ exports.login = async (req, res) => {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
+};
+
+// Send OTP for password reset
+exports.sendPasswordResetOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ error: 'Valid email is required' });
+    }
+
+    // Check if user exists
+    const user = await User.findOne({ email });
+    if (!user) {
+      // Don't reveal if email exists for security
+      return res.json({ message: 'If email exists, OTP has been sent' });
+    }
+
+    // Generate 6-digit OTP
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Delete any existing password reset OTPs for this email
+    await OTP.deleteMany({ email, type: 'password-reset' });
+
+    // Create new OTP (expires in 10 minutes)
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    await OTP.create({ email, code, expiresAt, type: 'password-reset' });
+
+    // Send OTP email
+    try {
+      await emailService.sendPasswordResetOTP(email, code);
+      res.json({ message: 'OTP sent to your email', email });
+    } catch (emailError) {
+      console.error('Email sending error:', emailError);
+      // In development, still return success
+      if (process.env.NODE_ENV === 'development') {
+        res.json({ message: 'OTP sent (check console for dev mode)', email, devCode: code });
+      } else {
+        res.status(500).json({ error: 'Failed to send OTP email' });
+      }
+    }
+  } catch (err) {
+    console.error('Send password reset OTP error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// Verify OTP and reset password
+exports.resetPassword = async (req, res) => {
+  try {
+    const { email, code, newPassword } = req.body;
+
+    if (!email || !code || !newPassword) {
+      return res.status(400).json({ error: 'Email, OTP code, and new password are required' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    // Find OTP
+    const otp = await OTP.findOne({ email, code, type: 'password-reset', verified: false });
+
+    if (!otp) {
+      return res.status(400).json({ error: 'Invalid or expired OTP' });
+    }
+
+    // Check if expired
+    if (new Date() > otp.expiresAt) {
+      await OTP.deleteOne({ _id: otp._id });
+      return res.status(400).json({ error: 'OTP has expired' });
+    }
+
+    // Find user
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Update password
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await User.findByIdAndUpdate(user._id, { passwordHash });
+
+    // Delete OTP after successful reset
+    await OTP.deleteOne({ _id: otp._id });
+
+    res.json({ message: 'Password reset successfully' });
+  } catch (err) {
+    console.error('Reset password error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// Google OAuth callback handler
+exports.googleCallback = async (req, res) => {
+  try {
+    const user = req.user;
+    
+    if (!user) {
+      const redirectUri = req.query.redirect_uri || process.env.FRONTEND_URL || 'aybay://auth/callback';
+      return res.redirect(`${redirectUri}?error=authentication_failed`);
+    }
+
+    // Generate JWT token
+    const token = jwt.sign({ id: user._id }, config.jwtSecret, { expiresIn: '7d' });
+
+    // Get redirect URI from query or use default
+    const redirectUri = req.query.redirect_uri || process.env.FRONTEND_URL || 'aybay://auth/callback';
+    
+    // Redirect to frontend with token (using deep link for mobile)
+    const redirectUrl = `${redirectUri}?token=${token}&user=${encodeURIComponent(JSON.stringify({
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar
+    }))}`;
+    
+    res.redirect(redirectUrl);
+  } catch (error) {
+    console.error('Google OAuth callback error:', error);
+    const redirectUri = req.query.redirect_uri || process.env.FRONTEND_URL || 'aybay://auth/callback';
+    res.redirect(`${redirectUri}?error=server_error`);
+  }
+};
+
+// Google OAuth failure handler
+exports.googleFailure = (req, res) => {
+  const redirectUri = req.query.redirect_uri || process.env.FRONTEND_URL || 'aybay://auth/callback';
+  res.redirect(`${redirectUri}?error=authentication_failed`);
 };
 
 exports.updateProfile = async (req, res) => {

@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const session = require('express-session');
+const passport = require('./config/passport');
 const config = require('./config');
 
 const authRoutes = require('./routes/auth');
@@ -20,8 +22,30 @@ const uploadRoutes = require('./routes/upload');
 
 const app = express();
 
-app.use(cors());
+// CORS configuration for OAuth
+app.use(cors({
+  origin: process.env.FRONTEND_URL || '*',
+  credentials: true,
+}));
 app.use(express.json());
+
+// Session configuration for Passport
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || config.jwtSecret,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    },
+  })
+);
+
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/transactions', transactionRoutes);
