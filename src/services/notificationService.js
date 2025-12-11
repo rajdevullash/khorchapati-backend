@@ -4,6 +4,35 @@ const User = require('../models/User');
 
 const expo = new Expo();
 
+// Firebase Admin SDK (optional - only initialize if credentials exist)
+let admin = null;
+try {
+  // Try to load Firebase Admin config
+  const path = require('path');
+  const adminPath = path.join(__dirname, '../config/firebase-admin.js');
+  const fs = require('fs');
+  
+  if (fs.existsSync(adminPath)) {
+    admin = require('../config/firebase-admin');
+    console.log('✅ Firebase Admin SDK initialized for FCM support');
+  } else {
+    console.log('⚠️ Firebase Admin SDK not configured. FCM notifications will be skipped.');
+    console.log('   To enable FCM: See backend/FIREBASE_SETUP.md');
+  }
+} catch (error) {
+  console.log('⚠️ Firebase Admin SDK initialization failed:', error.message);
+  console.log('   Expo push notifications will still work. See backend/FIREBASE_SETUP.md for FCM setup');
+}
+
+// Helper functions to detect token type
+function isExpoToken(token) {
+  return token && (token.startsWith('ExponentPushToken[') || token.startsWith('ExpoPushToken'));
+}
+
+function isFCMToken(token) {
+  return token && token.length > 100 && !isExpoToken(token);
+}
+
 class NotificationService {
   /**
    * Send push notification to a user
@@ -47,41 +76,98 @@ class NotificationService {
         return notif;
       }
 
-      // Check if token is valid Expo push token
-      if (!Expo.isExpoPushToken(user.pushToken)) {
-        console.error(`Push token ${user.pushToken} is not a valid Expo push token`);
-        return notif;
-      }
-
-      // Prepare push message
-      const message = {
-        to: user.pushToken,
-        sound: 'default',
-        title: notification.title,
-        body: notification.message,
-        data: { 
-          notificationId: notif._id.toString(),
-          ...notification.data 
-        },
-        priority: notification.priority === 'high' ? 'high' : 'default',
-        badge: await this.getUnreadCount(userId)
-      };
-
-      // Send push notification
-      const chunks = expo.chunkPushNotifications([message]);
-      const tickets = [];
-
-      for (const chunk of chunks) {
-        try {
-          const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
-          tickets.push(...ticketChunk);
-        } catch (error) {
-          console.error('Error sending push notification chunk:', error);
+      // Detect token type and send accordingly
+      if (isExpoToken(user.pushToken)) {
+        // Send via Expo (for React Native apps)
+        if (!Expo.isExpoPushToken(user.pushToken)) {
+          console.error(`Invalid Expo push token: ${user.pushToken}`);
+          return notif;
         }
 
-      }
+        // Prepare push message
+        const message = {
+          to: user.pushToken,
+          sound: 'default',
+          title: notification.title,
+          body: notification.message,
+          data: { 
+            notificationId: notif._id.toString(),
+            ...notification.data 
+          },
+          priority: notification.priority === 'high' ? 'high' : 'default',
+          badge: await this.getUnreadCount(userId)
+        };
 
-      console.log('Push notification sent:', tickets);
+        // Send push notification
+        const chunks = expo.chunkPushNotifications([message]);
+        const tickets = [];
+
+        for (const chunk of chunks) {
+          try {
+            const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
+            tickets.push(...ticketChunk);
+          } catch (error) {
+            console.error('Error sending Expo push notification chunk:', error);
+          }
+        }
+
+        console.log('✅ Expo push notification sent:', tickets);
+        
+      } else if (isFCMToken(user.pushToken)) {
+        // Send via FCM (for Flutter apps)
+        if (!admin) {
+          console.log('⚠️ FCM token detected but Firebase Admin SDK not configured. Skipping push notification.');
+          return notif;
+        }
+
+        try {
+          const fcmMessage = {
+            notification: {
+              title: notification.title,
+              body: notification.message,
+            },
+            data: {
+              notificationId: notif._id.toString(),
+              type: notification.type || '',
+              ...Object.fromEntries(
+                Object.entries(notification.data || {}).map(([k, v]) => [k, String(v)])
+              )
+            },
+            token: user.pushToken,
+            android: {
+              priority: notification.priority === 'high' ? 'high' : 'normal',
+              notification: {
+                sound: 'default',
+                channelId: 'high_importance_channel'
+              }
+            },
+            apns: {
+              payload: {
+                aps: {
+                  sound: 'default',
+                  badge: await this.getUnreadCount(userId)
+                }
+              }
+            }
+          };
+
+          const response = await admin.messaging().send(fcmMessage);
+          console.log('✅ FCM push notification sent successfully:', response);
+        } catch (error) {
+          console.error('❌ Error sending FCM push notification:', error);
+          
+          // If token is invalid, remove it from user
+          if (error.code === 'messaging/invalid-registration-token' || 
+              error.code === 'messaging/registration-token-not-registered') {
+            console.log('⚠️ Removing invalid FCM token from user');
+            user.pushToken = null;
+            await user.save();
+          }
+        }
+      } else {
+        console.error(`⚠️ Unknown token format: ${user.pushToken?.substring(0, 50)}...`);
+        return notif;
+      }
       return notif;
     } catch (error) {
       console.error('Error in sendNotification:', error);
