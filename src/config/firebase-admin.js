@@ -6,18 +6,40 @@ const admin = require('firebase-admin');
 const path = require('path');
 const fs = require('fs');
 
+// Path to service account key file
+const serviceAccountPath = path.join(__dirname, 'service-account-key.json');
+
+// Check if service account key file exists
 
   // File not found, try environment variables as fallback
-  // Try using environment variables (for production)
-  const hasProjectId = !!process.env.FIREBASE_PROJECT_ID
-  const hasClientEmail = !!process.env.FIREBASE_CLIENT_EMAIL
-  const hasPrivateKey = !!process.env.FIREBASE_PRIVATE_KEY
+  const hasProjectId = !!process.env.FIREBASE_PROJECT_ID;
+  const hasClientEmail = !!process.env.FIREBASE_CLIENT_EMAIL;
+  const hasPrivateKey = !!process.env.FIREBASE_PRIVATE_KEY;
   
   if (hasProjectId && hasClientEmail && hasPrivateKey) {
     try {
       // Only initialize if not already initialized
       if (!admin.apps || admin.apps.length === 0) {
-        const privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
+        // Clean and format private key properly
+        let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+        
+        // Remove surrounding quotes if present (both single and double)
+        privateKey = privateKey.replace(/^["']|["']$/g, '');
+        
+        // Replace escaped newlines with actual newlines
+        // Handle both \\n and \n cases
+        privateKey = privateKey.replace(/\\n/g, '\n');
+        
+        // Debug: Check if BEGIN/END markers are present (without logging the actual key)
+        const hasBegin = privateKey.includes('BEGIN PRIVATE KEY');
+        const hasEnd = privateKey.includes('END PRIVATE KEY');
+        
+        if (!hasBegin || !hasEnd) {
+          console.error('⚠️ Private key format issue:');
+          if (!hasBegin) console.error('   Missing BEGIN PRIVATE KEY marker');
+          if (!hasEnd) console.error('   Missing END PRIVATE KEY marker');
+          console.error('   Make sure to copy the ENTIRE private_key value from JSON file');
+        }
         
         admin.initializeApp({
           credential: admin.credential.cert({
@@ -42,6 +64,20 @@ const fs = require('fs');
       console.error('❌ FIREBASE ADMIN SDK INITIALIZATION FAILED');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.error(`   Error: ${error.message}`);
+      if (error.message.includes('secretOrPrivateKey')) {
+        console.error('');
+        console.error('   🔍 Private Key Format Issue Detected!');
+        console.error('   Common causes:');
+        console.error('   1. Private key missing BEGIN/END markers');
+        console.error('   2. Newlines not properly escaped (should be \\n)');
+        console.error('   3. Extra quotes or spaces');
+        console.error('');
+        console.error('   💡 Solution:');
+        console.error('   - Copy the ENTIRE private_key value from JSON file');
+        console.error('   - Include -----BEGIN PRIVATE KEY----- and -----END PRIVATE KEY-----');
+        console.error('   - Keep all \\n characters as they are');
+        console.error('   - Wrap in double quotes in Render environment variable');
+      }
       if (error.stack) {
         console.error('   Stack:', error.stack.split('\n')[1]?.trim());
       }
@@ -84,4 +120,3 @@ const fs = require('fs');
 
 
 module.exports = admin;
-
