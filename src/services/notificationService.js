@@ -13,15 +13,22 @@ try {
   const fs = require('fs');
   
   if (fs.existsSync(adminPath)) {
-    admin = require('../config/firebase-admin');
-    console.log('✅ Firebase Admin SDK initialized for FCM support');
+    const adminModule = require('../config/firebase-admin');
+    // Check if admin is actually initialized (has at least one app)
+    if (adminModule && adminModule.apps && adminModule.apps.length > 0) {
+      admin = adminModule;
+      console.log('✅ Firebase Admin SDK initialized for FCM support');
+    } else {
+      console.log('⚠️ Firebase Admin SDK config file exists but not properly initialized.');
+      console.log('   Add service-account-key.json or set environment variables. See backend/FIREBASE_QUICK_SETUP.md');
+    }
   } else {
     console.log('⚠️ Firebase Admin SDK not configured. FCM notifications will be skipped.');
-    console.log('   To enable FCM: See backend/FIREBASE_SETUP.md');
+    console.log('   To enable FCM: See backend/FIREBASE_QUICK_SETUP.md');
   }
 } catch (error) {
   console.log('⚠️ Firebase Admin SDK initialization failed:', error.message);
-  console.log('   Expo push notifications will still work. See backend/FIREBASE_SETUP.md for FCM setup');
+  console.log('   Expo push notifications will still work. See backend/FIREBASE_QUICK_SETUP.md for FCM setup');
 }
 
 // Helper functions to detect token type
