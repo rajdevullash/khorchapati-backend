@@ -6,51 +6,12 @@ const admin = require('firebase-admin');
 const path = require('path');
 const fs = require('fs');
 
-// Path to service account key file
-const serviceAccountPath = path.join(__dirname, 'service-account-key.json');
 
-// Check if service account key file exists (priority: file first, then env vars)
-if (fs.existsSync(serviceAccountPath)) {
-  try {
-    const serviceAccount = require('./service-account-key.json');
-    
-    // Only initialize if not already initialized
-    if (!admin.apps || admin.apps.length === 0) {
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        projectId: serviceAccount.project_id || 'khorochkhata'
-      });
-      console.log('');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('✅ FIREBASE ADMIN SDK INITIALIZED (from file)');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log(`   Project ID: ${serviceAccount.project_id || 'khorochkhata'}`);
-      console.log(`   Client Email: ${serviceAccount.client_email || 'N/A'}`);
-      console.log('   FCM push notifications are ENABLED');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('');
-    }
-  } catch (error) {
-    console.log('');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.error('❌ FIREBASE ADMIN SDK INITIALIZATION FAILED (file)');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.error(`   Error: ${error.message}`);
-    if (error.stack) {
-      console.error('   Stack:', error.stack.split('\n')[1]?.trim());
-    }
-    console.log('   FCM notifications will be DISABLED');
-    console.log('   Check service-account-key.json file format');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('');
-    // Don't throw - allow app to continue without FCM
-  }
-} else {
   // File not found, try environment variables as fallback
   // Try using environment variables (for production)
-  const hasProjectId = !!process.env.FIREBASE_PROJECT_ID;
-  const hasClientEmail = !!process.env.FIREBASE_CLIENT_EMAIL;
-  const hasPrivateKey = !!process.env.FIREBASE_PRIVATE_KEY;
+  const hasProjectId = !!process.env.FIREBASE_PROJECT_ID
+  const hasClientEmail = !!process.env.FIREBASE_CLIENT_EMAIL
+  const hasPrivateKey = !!process.env.FIREBASE_PRIVATE_KEY
   
   if (hasProjectId && hasClientEmail && hasPrivateKey) {
     try {
@@ -120,7 +81,7 @@ if (fs.existsSync(serviceAccountPath)) {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('');
   }
-}
+
 
 module.exports = admin;
 
