@@ -122,8 +122,11 @@ class NotificationService {
         
       } else if (isFCMToken(user.pushToken)) {
         // Send via FCM (for Flutter apps)
-        if (!admin) {
+        if (!admin || !admin.apps || admin.apps.length === 0) {
           console.log('⚠️ FCM token detected but Firebase Admin SDK not configured. Skipping push notification.');
+          if (admin && admin.apps) {
+            console.log(`   Admin module loaded but not initialized. Apps count: ${admin.apps.length}`);
+          }
           return notif;
         }
 
