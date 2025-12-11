@@ -5,6 +5,5 @@ node_modules
 *.log
 .DS_Store
 
-# Firebase service account key (contains sensitive credentials)
+# Firebase service account key (contains sensitive credentials - DO NOT COMMIT!)
 src/config/service-account-key.json
-src/config/firebase-admin.js

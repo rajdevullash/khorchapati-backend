@@ -13,17 +13,21 @@ try {
   const fs = require('fs');
   
   if (fs.existsSync(adminPath)) {
+    // Load the module (this will execute firebase-admin.js and show detailed logs)
     const adminModule = require('../config/firebase-admin');
+    
     // Check if admin is actually initialized (has at least one app)
     if (adminModule && adminModule.apps && adminModule.apps.length > 0) {
       admin = adminModule;
       console.log('✅ Firebase Admin SDK initialized for FCM support');
     } else {
-      console.log('⚠️ Firebase Admin SDK config file exists but not properly initialized.');
-      console.log('   Add service-account-key.json or set environment variables. See backend/FIREBASE_QUICK_SETUP.md');
+      // Detailed logs should already be shown by firebase-admin.js
+      // Just add a summary here
+      console.log('⚠️ Firebase Admin SDK config file exists but admin is not initialized.');
+      console.log('   Check the logs above for details on missing credentials.');
     }
   } else {
-    console.log('⚠️ Firebase Admin SDK not configured. FCM notifications will be skipped.');
+    console.log('⚠️ Firebase Admin SDK config file not found.');
     console.log('   To enable FCM: See backend/FIREBASE_QUICK_SETUP.md');
   }
 } catch (error) {
