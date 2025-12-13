@@ -11,4 +11,9 @@ mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('Connected to MongoDB'))
   .catch((err) => console.error('MongoDB connection error:', err.message));
 
-module.exports = { port, mongoUri, jwtSecret };
+const email = {
+  user: process.env.EMAIL_USER,
+  pass: process.env.EMAIL_PASS,
+};
+
+module.exports = { port, mongoUri, jwtSecret, email };
