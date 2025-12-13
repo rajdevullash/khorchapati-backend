@@ -1,19 +1,8 @@
 const nodemailer = require('nodemailer');
 
-// Create transporter with better configuration for production
+// Create transporter with Gmail SMTP configuration
 const createTransporter = () => {
-  // Check if using SendGrid
-  if (process.env.SENDGRID_API_KEY) {
-    return nodemailer.createTransport({
-      service: 'SendGrid',
-      auth: {
-        user: 'apikey',
-        pass: process.env.SENDGRID_API_KEY
-      }
-    });
-  }
-
-  // Check if using custom SMTP
+  // Check if using custom SMTP (optional override)
   if (process.env.SMTP_HOST && process.env.SMTP_PORT) {
     return nodemailer.createTransport({
       host: process.env.SMTP_HOST,
@@ -32,12 +21,13 @@ const createTransporter = () => {
     });
   }
 
-  // Default: Gmail SMTP with improved settings
+  // Default: Gmail SMTP
   const emailUser = process.env.EMAIL_USER;
   const emailPass = process.env.EMAIL_PASS;
   
   if (!emailUser || !emailPass) {
     console.warn('⚠️ EMAIL_USER or EMAIL_PASS not set. Email service will fail.');
+    console.warn('💡 Gmail App Password setup: https://myaccount.google.com/apppasswords');
     console.warn('💡 Set ALLOW_EMAIL_FAILURE=true to log OTP in console instead.');
   }
   
@@ -47,12 +37,12 @@ const createTransporter = () => {
     port: 587,
     secure: false, // true for 465, false for other ports
     auth: {
-      user: emailUser || 'your-email@gmail.com',
-      pass: emailPass || 'your-app-password' // Use App Password for Gmail
+      user: emailUser,
+      pass: emailPass // Use App Password for Gmail (not regular password)
     },
-    connectionTimeout: 15000, // 15 seconds
-    greetingTimeout: 15000,
-    socketTimeout: 15000,
+    connectionTimeout: 20000, // 20 seconds (increased for better reliability)
+    greetingTimeout: 20000,
+    socketTimeout: 20000,
     pool: false, // Disable pooling for better reliability
     tls: {
       rejectUnauthorized: false, // Sometimes needed for certain networks
@@ -89,11 +79,11 @@ exports.sendOTP = async (email, code) => {
       text: `Your verification code is: ${code}. This code will expire in 10 minutes.`
     };
 
-    // Add timeout wrapper
+    // Add timeout wrapper (increased timeout for Gmail)
     const sendWithTimeout = Promise.race([
       transporter.sendMail(mailOptions),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Email sending timeout')), 15000)
+        setTimeout(() => reject(new Error('Email sending timeout')), 25000) // 25 seconds
       )
     ]);
 
@@ -106,13 +96,17 @@ exports.sendOTP = async (email, code) => {
     // Always log OTP in console for debugging (even in production)
     console.log('📧 [FALLBACK] OTP for', email, ':', code);
     console.log('⚠️ Email service unavailable. OTP logged above for manual verification.');
+    console.log('💡 Tip: Set ALLOW_EMAIL_FAILURE=true to return OTP in API response');
     
-    // In development or if email fails, return success with dev mode flag
+    // In development or if ALLOW_EMAIL_FAILURE is set, return success with dev mode flag
+    // This allows the frontend to receive the OTP code even if email fails
     if (process.env.NODE_ENV === 'development' || process.env.ALLOW_EMAIL_FAILURE === 'true') {
+      console.log('✅ Returning OTP in response (dev mode)');
       return { success: true, devMode: true, code }; // Return code for testing
     }
     
-    // In production, still throw error but log the OTP
+    // In production without ALLOW_EMAIL_FAILURE, still throw error but log the OTP
+    // The authController will catch this and return the OTP in the response anyway
     throw new Error(`Email sending failed: ${error.message}. OTP: ${code} (logged in console)`);
   }
 };
@@ -146,11 +140,11 @@ exports.sendPasswordResetOTP = async (email, code) => {
       text: `Your password reset code is: ${code}. This code will expire in 10 minutes. If you didn't request this, please ignore this email.`
     };
 
-    // Add timeout wrapper
+    // Add timeout wrapper (increased timeout for Gmail)
     const sendWithTimeout = Promise.race([
       transporter.sendMail(mailOptions),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Email sending timeout')), 15000)
+        setTimeout(() => reject(new Error('Email sending timeout')), 25000) // 25 seconds
       )
     ]);
 
