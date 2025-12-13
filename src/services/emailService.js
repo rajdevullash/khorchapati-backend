@@ -40,14 +40,21 @@ const createTransporter = () => {
       user: emailUser,
       pass: emailPass // Use App Password for Gmail (not regular password)
     },
-    connectionTimeout: 20000, // 20 seconds (increased for better reliability)
-    greetingTimeout: 20000,
-    socketTimeout: 20000,
-    pool: false, // Disable pooling for better reliability
+    connectionTimeout: 60000, // 60 seconds (increased for background/cloud environments)
+    greetingTimeout: 30000, // 30 seconds
+    socketTimeout: 60000, // 60 seconds
+    pool: true, // Enable connection pooling for better reliability
+    maxConnections: 5,
+    maxMessages: 100,
+    rateDelta: 1000,
+    rateLimit: 5,
     tls: {
       rejectUnauthorized: false, // Sometimes needed for certain networks
+      minVersion: 'TLSv1.2',
       ciphers: 'SSLv3'
-    }
+    },
+    debug: false, // Set to true for debugging
+    logger: false
   });
 };
 
@@ -79,17 +86,34 @@ exports.sendOTP = async (email, code) => {
       text: `Your verification code is: ${code}. This code will expire in 10 minutes.`
     };
 
-    // Add timeout wrapper (increased timeout for Gmail)
-    const sendWithTimeout = Promise.race([
-      transporter.sendMail(mailOptions),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Email sending timeout')), 25000) // 25 seconds
-      )
-    ]);
+    // Add timeout wrapper with retry mechanism (increased timeout for Gmail/background)
+    let lastError;
+    const maxRetries = 2;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const sendWithTimeout = Promise.race([
+          transporter.sendMail(mailOptions),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Email sending timeout')), 60000) // 60 seconds
+          )
+        ]);
 
-    const info = await sendWithTimeout;
-    console.log('✅ OTP email sent:', info.messageId);
-    return { success: true, messageId: info.messageId };
+        const info = await sendWithTimeout;
+        console.log('✅ OTP email sent:', info.messageId);
+        return { success: true, messageId: info.messageId };
+      } catch (attemptError) {
+        lastError = attemptError;
+        if (attempt < maxRetries) {
+          const delay = (attempt + 1) * 2000; // 2s, 4s delays
+          console.log(`⚠️ Email send attempt ${attempt + 1} failed, retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    
+    // All retries failed
+    throw lastError;
   } catch (error) {
     console.error('❌ Error sending OTP email:', error);
     
@@ -140,17 +164,34 @@ exports.sendPasswordResetOTP = async (email, code) => {
       text: `Your password reset code is: ${code}. This code will expire in 10 minutes. If you didn't request this, please ignore this email.`
     };
 
-    // Add timeout wrapper (increased timeout for Gmail)
-    const sendWithTimeout = Promise.race([
-      transporter.sendMail(mailOptions),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Email sending timeout')), 25000) // 25 seconds
-      )
-    ]);
+    // Add timeout wrapper with retry mechanism (increased timeout for Gmail/background)
+    let lastError;
+    const maxRetries = 2;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const sendWithTimeout = Promise.race([
+          transporter.sendMail(mailOptions),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Email sending timeout')), 60000) // 60 seconds
+          )
+        ]);
 
-    const info = await sendWithTimeout;
-    console.log('✅ Password reset OTP email sent:', info.messageId);
-    return { success: true, messageId: info.messageId };
+        const info = await sendWithTimeout;
+        console.log('✅ Password reset OTP email sent:', info.messageId);
+        return { success: true, messageId: info.messageId };
+      } catch (attemptError) {
+        lastError = attemptError;
+        if (attempt < maxRetries) {
+          const delay = (attempt + 1) * 2000; // 2s, 4s delays
+          console.log(`⚠️ Password reset email send attempt ${attempt + 1} failed, retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    
+    // All retries failed
+    throw lastError;
   } catch (error) {
     console.error('❌ Error sending password reset OTP email:', error);
     
