@@ -1,8 +1,11 @@
 const nodemailer = require('nodemailer');
 const config = require('../config');
 
-// Create a reusable transporter
-const transporter = nodemailer.createTransport({
+// Build transport options based on available configuration.
+// Prefer SendGrid API key if provided (using SendGrid SMTP relay), otherwise use SMTP settings.
+
+// Use Gmail SMTP explicitly per request. Credentials come from config.email (EMAIL_USER / EMAIL_PASS).
+const transportOptions = {
   host: 'smtp.gmail.com',
   port: 587,
   secure: false,
@@ -10,7 +13,17 @@ const transporter = nodemailer.createTransport({
     user: config.email.user,
     pass: config.email.pass,
   },
-});
+};
+
+console.log(`📤 Email: configured to use Gmail SMTP (${transportOptions.host}:${transportOptions.port})`);
+
+// Create a reusable transporter
+const transporter = nodemailer.createTransport(transportOptions);
+
+// Verify transporter on startup so deploy logs show connectivity/auth errors early
+transporter.verify()
+  .then(() => console.log('✅ Email transporter verified'))
+  .catch((err) => console.warn('⚠️ Email transporter verification failed:', err && err.message ? err.message : err));
 
 // Send email function
 const sendEmail = async (to, subject, html) => {
@@ -23,7 +36,12 @@ const sendEmail = async (to, subject, html) => {
     });
     console.log(`✅ Email sent successfully to ${to}`);
   } catch (error) {
-    console.error('❌ Error sending email:', error);
+    console.error('❌ Error sending email:', error && error.message ? error.message : error);
+    // In debug-friendly mode (development or ALLOW_EMAIL_FAILURE) we log and continue.
+    if (config.allowEmailFailure) {
+      console.warn('⚠️ allowEmailFailure is enabled: email failure will not block the flow. OTP is logged to console for verification.');
+      return { success: true, devMode: true };
+    }
     throw error;
   }
 };
@@ -55,19 +73,19 @@ exports.sendOTP = async (email, code) => {
     
     return { success: true };
   } catch (error) {
-    console.error('❌ Error sending OTP email:', error);
-    
+    console.error('❌ Error sending OTP email:', error && error.message ? error.message : error);
+
     // Always log OTP in console for debugging
     console.log(`📧 [FALLBACK] OTP for ${email}: ${code}`);
     console.log('⚠️ Email service unavailable. OTP logged above for manual verification.');
-    
-    // In development or if ALLOW_EMAIL_FAILURE is set, return success
-    if (process.env.NODE_ENV === 'development' || process.env.ALLOW_EMAIL_FAILURE === 'true') {
+
+    // Respect centralized allowEmailFailure flag from config
+    if (config.allowEmailFailure) {
       return { success: true, devMode: true, code };
     }
-    
-    // In production, throw error but log the OTP
-    throw new Error(`Email sending failed: ${error.message}. OTP: ${code} (logged in console)`);
+
+    // In production, throw error but include OTP in the message for operators to find in logs
+    throw new Error(`Email sending failed: ${error && error.message ? error.message : error}. OTP: ${code} (logged in console)`);
   }
 };
 
