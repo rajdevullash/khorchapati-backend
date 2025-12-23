@@ -12,7 +12,13 @@ const notificationSchema = new mongoose.Schema({
       'settlement_done',    // Settlement completed
       'payment_reminder',   // Payment due reminder
       'budget_alert',       // Budget exceeded
-      'group_invite'        // Invited to group
+      'group_invite',       // Invited to group
+      'info',               // General information
+      'announcement',       // Admin announcements
+      'reminder',           // General reminders
+      'success',            // Success messages
+      'warning',            // Warning messages
+      'promo'               // Promotional messages
     ],
     required: true 
   },

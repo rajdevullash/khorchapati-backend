@@ -1,4 +1,5 @@
 const subscriptionReminderService = require('../services/subscriptionReminderService');
+const scheduledNotificationService = require('../services/scheduledNotificationService');
 
 /**
  * Start scheduled tasks for subscription reminders
@@ -32,6 +33,11 @@ function startScheduler() {
       subscriptionReminderService.checkAndSendReminders().catch(console.error);
     }, 24 * 60 * 60 * 1000); // 24 hours
   }, msUntilNextRun);
+
+  // Also start scheduled notification checker (runs every 60 seconds)
+  setInterval(() => {
+    scheduledNotificationService.checkAndSendDueNotifications().catch(console.error);
+  }, 60 * 1000);
 }
 
 module.exports = {

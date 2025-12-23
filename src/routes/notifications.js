@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../utils/authMiddleware');
+const requireRole = require('../utils/roleMiddleware');
 const notificationsController = require('../controllers/notificationsController');
 
 router.use(auth);
@@ -13,6 +14,6 @@ router.put('/read-all', notificationsController.markAllAsRead);
 router.delete('/:id', notificationsController.deleteNotification);
 router.post('/push-token', notificationsController.updatePushToken);
 router.put('/settings', notificationsController.updateSettings);
-router.post('/broadcast', notificationsController.broadcastToAll);
+router.post('/broadcast', requireRole(['admin', 'super_admin']), notificationsController.broadcastToAll);
 
 module.exports = router;

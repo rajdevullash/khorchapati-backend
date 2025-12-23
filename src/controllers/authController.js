@@ -119,8 +119,8 @@ exports.register = async (req, res) => {
     // Delete verified OTP after successful registration
     await OTP.deleteOne({ _id: verifiedOTP._id });
 
-    const token = jwt.sign({ id: user._id }, config.jwtSecret, { expiresIn: '7d' });
-    res.json({ user: { id: user._id, name: user.name, email: user.email, avatar: user.avatar }, token });
+  const token = jwt.sign({ id: user._id, role: user.role }, config.jwtSecret, { expiresIn: '7d' });
+    res.json({ user: { id: user._id, name: user.name, email: user.email, avatar: user.avatar, role: user.role }, token });
   } catch (err) {
     if (err.name === 'ZodError') return res.status(400).json({ error: err.errors });
     console.error(err);
@@ -141,8 +141,8 @@ exports.login = async (req, res) => {
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
 
-    const token = jwt.sign({ id: user._id }, config.jwtSecret, { expiresIn: '7d' });
-    res.json({ user: { id: user._id, name: user.name, email: user.email, avatar: user.avatar }, token });
+  const token = jwt.sign({ id: user._id, role: user.role }, config.jwtSecret, { expiresIn: '7d' });
+    res.json({ user: { id: user._id, name: user.name, email: user.email, avatar: user.avatar, role: user.role }, token });
   } catch (err) {
     if (err.name === 'ZodError') return res.status(400).json({ error: err.errors });
     console.error(err);
@@ -346,7 +346,7 @@ exports.googleSignInWithIdToken = async (req, res) => {
 
     if (user) {
       // User exists, return user
-      const token = jwt.sign({ id: user._id }, config.jwtSecret, { expiresIn: '7d' });
+      const token = jwt.sign({ id: user._id, role: user.role }, config.jwtSecret, { expiresIn: '7d' });
       return res.json({
         token,
         user: {
@@ -354,6 +354,7 @@ exports.googleSignInWithIdToken = async (req, res) => {
           name: user.name,
           email: user.email,
           avatar: user.avatar,
+          role: user.role,
         },
       });
     }
@@ -369,7 +370,7 @@ exports.googleSignInWithIdToken = async (req, res) => {
       }
       await user.save();
 
-      const token = jwt.sign({ id: user._id }, config.jwtSecret, { expiresIn: '7d' });
+      const token = jwt.sign({ id: user._id, role: user.role }, config.jwtSecret, { expiresIn: '7d' });
       return res.json({
         token,
         user: {
@@ -377,6 +378,7 @@ exports.googleSignInWithIdToken = async (req, res) => {
           name: user.name,
           email: user.email,
           avatar: user.avatar,
+          role: user.role,
         },
       });
     }
@@ -389,7 +391,7 @@ exports.googleSignInWithIdToken = async (req, res) => {
       avatar: picture || null,
     });
 
-    const token = jwt.sign({ id: user._id }, config.jwtSecret, { expiresIn: '7d' });
+  const token = jwt.sign({ id: user._id, role: user.role }, config.jwtSecret, { expiresIn: '7d' });
     res.json({
       token,
       user: {
@@ -397,6 +399,7 @@ exports.googleSignInWithIdToken = async (req, res) => {
         name: user.name,
         email: user.email,
         avatar: user.avatar,
+        role: user.role,
       },
     });
   } catch (error) {

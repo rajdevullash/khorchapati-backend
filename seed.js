@@ -61,6 +61,24 @@ async function seed() {
       console.log(`ℹ️  Demo user already exists: ${existingDemoUser.email}`);
     }
 
+    // Create super admin if not exists
+    const existingSuper = await User.findOne({ email: 'superadmin@aybay.com' });
+    if (!existingSuper) {
+      const hashedPassword = await bcrypt.hash('supersecret', 10);
+      const superAdmin = await User.create({
+        name: 'Super Admin',
+        email: 'superadmin@aybay.com',
+        passwordHash: hashedPassword,
+        role: 'super_admin',
+        currency: 'BDT',
+        theme: 'dark',
+        notificationsEnabled: true
+      });
+      console.log(`✅ Created super admin: ${superAdmin.email} (password: supersecret)`);
+    } else {
+      console.log(`ℹ️  Super admin already exists: ${existingSuper.email}`);
+    }
+
     // Insert default categories (without user reference for default items)
     const categories = await Category.insertMany(
       defaultCategories.map(c => ({ ...c, user: null }))

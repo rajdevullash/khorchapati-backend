@@ -16,6 +16,7 @@ const exportRoutes = require('./routes/export');
 const reportsRoutes = require('./routes/reports');
 const groupsRoutes = require('./routes/groups');
 const notificationsRoutes = require('./routes/notifications');
+const adminRoutes = require('./routes/admin');
 const receiptsRoutes = require('./routes/receipts');
 const uploadRoutes = require('./routes/upload');
 
@@ -23,7 +24,7 @@ const app = express();
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
+  origin: process.env.DASHBOARD_FRONTEND_URL || 'http://localhost:3000',
   credentials: true,
 }));
 app.use(express.json());
@@ -45,6 +46,7 @@ app.use('/api/groups', groupsRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/receipts', receiptsRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/admin', adminRoutes);
 
 // basic health
 app.get('/health', (req, res) => res.json({ ok: true }));

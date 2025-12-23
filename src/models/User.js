@@ -17,7 +17,14 @@ const userSchema = new mongoose.Schema({
     reminders: { type: Boolean, default: true },
     budgets: { type: Boolean, default: true }
   },
+  // Role for admin access control: 'user' | 'support' | 'admin' | 'super_admin'
+  role: { type: String, enum: ['user', 'support', 'admin', 'super_admin'], default: 'user' },
+  // Active flag - admins can suspend/ban users by setting this to false
+  isActive: { type: Boolean, default: true },
+  // Premium user flag for segment targeting
+  isPremium: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now }
 });
 
 module.exports = mongoose.model('User', userSchema);
+
