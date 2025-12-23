@@ -15,7 +15,7 @@ async function testEmail() {
   console.log('\n');
   
   // Test sending email
-  const testEmail = process.env.TEST_EMAIL || 'test@example.com';
+  const testEmail = 'movieraj639@gmail.com';
   const testCode = '123456';
   
   try {

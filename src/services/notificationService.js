@@ -73,6 +73,7 @@ class NotificationService {
       // Check notification preferences
       const typeMap = {
         'expense_added': 'expenses',
+        'income_added': 'expenses', // Use same setting as expenses for now
         'member_added': 'members',
         'settlement_request': 'settlements',
         'settlement_done': 'settlements',
@@ -431,9 +432,10 @@ class NotificationService {
       
       const typeText = transaction.type === 'expense' ? 'খরচ' : 'আয়';
       const icon = transaction.type === 'expense' ? '💸' : '💰';
+      const notificationType = transaction.type === 'expense' ? 'expense_added' : 'income_added';
       
       const notification = {
-        type: 'expense_added',
+        type: notificationType,
         title: `${icon} ${typeText} যোগ করা হয়েছে`,
         message: `৳${transaction.amount} - ${transaction.note || categoryName}`,
         data: {
@@ -441,7 +443,7 @@ class NotificationService {
           type: transaction.type,
           amount: transaction.amount
         },
-        priority: 'low'
+        priority: 'high' // Changed to high for immediate display
       };
 
       console.log('📤 Creating notification for own transaction:', notification);

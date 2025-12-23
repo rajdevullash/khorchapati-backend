@@ -48,6 +48,7 @@ router.post(
 );
 
 // Protected routes
+router.get('/profile', auth, authController.getProfile);
 router.put('/profile', auth, authController.updateProfile);
 
 module.exports = router;

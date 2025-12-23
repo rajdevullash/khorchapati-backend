@@ -6,6 +6,7 @@ const notificationSchema = new mongoose.Schema({
     type: String, 
     enum: [
       'expense_added',      // New expense in group
+      'income_added',       // New income in group
       'member_added',       // New member joined group
       'settlement_request', // Someone wants to settle
       'settlement_done',    // Settlement completed

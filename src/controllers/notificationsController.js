@@ -79,7 +79,7 @@ exports.updatePushToken = async (req, res) => {
 exports.updateSettings = async (req, res) => {
   try {
     const User = require('../models/User');
-    const { notificationsEnabled, notificationSettings } = req.body;
+    const { notificationsEnabled, notificationSettings, currency, theme } = req.body;
     
     const updateData = {};
     if (notificationsEnabled !== undefined) {
@@ -87,6 +87,12 @@ exports.updateSettings = async (req, res) => {
     }
     if (notificationSettings) {
       updateData.notificationSettings = notificationSettings;
+    }
+    if (currency) {
+      updateData.currency = currency;
+    }
+    if (theme) {
+      updateData.theme = theme;
     }
     
     const user = await User.findByIdAndUpdate(

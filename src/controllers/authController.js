@@ -251,6 +251,31 @@ exports.resetPassword = async (req, res) => {
 };
 
 
+exports.getProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const user = await User.findById(userId).select('-passwordHash');
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar,
+      currency: user.currency,
+      theme: user.theme,
+      notificationsEnabled: user.notificationsEnabled,
+      notificationSettings: user.notificationSettings
+    });
+  } catch (err) {
+    console.error('Get profile error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
 exports.updateProfile = async (req, res) => {
   try {
     const userId = req.user.id;
